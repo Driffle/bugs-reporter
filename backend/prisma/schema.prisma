@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ProcessedMessage {
+  id         String   @id @default(cuid())
+  messageId  String   @unique @map("message_id")
+  channelId  String   @map("channel_id")
+  ts         String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("processed_messages")
+}
+
+model Ticket {
+  id               String   @id @default(cuid())
+  planeId          String   @unique @map("plane_id")
+  planeSequenceId  String?  @map("plane_sequence_id")
+  slackMessageId   String   @map("slack_message_id")
+  contentHash      String   @map("content_hash")
+  channelId       String   @map("channel_id")
+  slackUserId     String?  @map("slack_user_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@map("tickets")
+}

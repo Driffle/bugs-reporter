@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Env (do not commit secrets)
+.env
+.env.local
+.env.*.local
+
+# Build
+dist/
+.next/
+out/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prisma
+backend/prisma/*.db
+backend/prisma/*.db-journal
+
+# Misc
+*.tsbuildinfo
