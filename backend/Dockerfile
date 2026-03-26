@@ -1,7 +1,12 @@
 # Production image (Railway / VPS). Root directory in Railway: set to `backend` if repo is monorepo.
-FROM node:20-alpine
+# Debian slim: Prisma engines need OpenSSL/glibc (Alpine musl often breaks schema-engine).
+FROM node:20-bookworm-slim
 
 WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
 COPY prisma ./prisma/

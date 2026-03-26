@@ -99,6 +99,10 @@ ngrok http 3000
 - Point Slack Event Subscriptions to your production URL (e.g. `https://your-domain.com/slack/events`).
 - Keep `PLANE_BASE_URL` and other Plane vars as needed for your self-hosted Plane.
 
+### Railway (Prisma + OpenSSL on Alpine)
+
+If you see **OpenSSL** warnings or **`Could not parse schema engine response`** / **`Error load...`**, the image was likely **Alpine-based** and Prisma’s native engine could not load. The project **Dockerfiles use `node:20-bookworm-slim`** with **`openssl`** installed so `prisma migrate deploy` and the app run correctly. Redeploy after pulling the latest Dockerfile.
+
 ### Railway (fix: `Cannot find module '/app/dist/main'`)
 
 That error means the **build step never produced `dist/`** before `node` ran. Do one of the following:
