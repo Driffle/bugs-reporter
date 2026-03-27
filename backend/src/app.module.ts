@@ -18,12 +18,14 @@ import { HealthModule } from './health/health.module';
     }),
     BullModule.forRootAsync({
       useFactory: () => {
+        // Managed Redis (e.g. Deployer ACL) often forbids INFO — ioredis ready check uses INFO; disable it.
         const redisOpts = {
           maxRetriesPerRequest: null,
           lazyConnect: true,
           connectTimeout: 10000,
+          enableReadyCheck: false,
           retryStrategy: (times: number) => Math.min(times * 300, 3000),
-        } as const;
+        };
         const redisUrl = process.env.REDIS_URL;
         if (redisUrl) {
           return { connection: { url: redisUrl, ...redisOpts } };
