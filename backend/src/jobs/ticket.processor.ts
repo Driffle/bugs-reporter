@@ -20,7 +20,7 @@ export interface TicketJobPayload {
   attachments?: { title?: string; title_link?: string; text?: string; image_url?: string }[];
 }
 
-@Processor('ticket')
+@Processor('ticket', { skipVersionCheck: true })
 export class TicketProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
