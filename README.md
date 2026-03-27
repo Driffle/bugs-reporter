@@ -112,9 +112,12 @@ Use **[deployer.driffle.net](https://deployer.driffle.net/)** with a repo under 
 
 1. Push **`Dockerfile`**, **`docker-compose.prod.yml`**, **`docker-compose.yml`**, **`.env.example`**, and source.
 2. **Do not commit** generated **`docker-compose.deployer*.yml`** or **`.deployer.env`** if they appear locally.
-3. Register the app; enable **Postgres** + **Redis** as needed; set env vars (same names as `.env.example`). Managed hostnames are typically **`postgres`** and **`redis`**.
-4. Deploy: **Pull latest**, **Force recreate**, **tunnel subdomain** → Slack URL **`https://<subdomain>.driffle.net/slack/events`**.
-5. Optional **`envServiceNames`**: if set, order so **`bugs-reporter`** is first so injection targets the web service.
+3. Register the app; enable **Postgres** + **Redis** in **Platform databases**. Managed hostnames are typically **`postgres`** and **`redis`**.
+4. **Environment / `DATABASE_URL` (fixes Prisma `P1000` auth errors):**  
+   The compose file does **not** embed `bugs:bugs` — credentials must match the **platform** database. Either leave **App .env** empty so Deployer injects `DATABASE_URL` / Redis from managed backends, **or** paste the exact connection strings from Deployer (Overview / env / `.deployer.env`) into **App .env**. After **Rotate database credentials**, update **App .env** or rely on fresh injection, then redeploy.
+5. Add **Slack + Plane** variables to **App .env** (`SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `CHANNEL_ID`, `PLANE_*`, etc.) — same names as **`.env.example`**.
+6. Deploy: **Pull latest**, **Force recreate** (if needed), **tunnel subdomain** → Slack **`https://<subdomain>.driffle.net/slack/events`**.
+7. Optional **`envServiceNames`**: if set, order so **`bugs-reporter`** is first so injection targets the web service.
 
 Migrations run in the container **`command`** (`prisma migrate deploy` then `node dist/main.js`).
 
