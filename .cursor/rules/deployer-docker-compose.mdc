@@ -227,12 +227,22 @@ Defaults merged into injected `environment` include: `OTEL_SERVICE_NAME` (from a
 Deployer may create or overwrite:
 
 - `docker-compose.deployer.yml`
-- `docker-compose.deployer.depreset.yml` (`depends_on: !reset []` for services that depended on embedded infra)
+- `docker-compose.deployer.depreset.yml` (`depends_on: !reset []` for services that depended on embedded infra — **Deployer-specific YAML extension**, not standard Docker Compose)
 - `docker-compose.deployer.depspatch.yml` (reapplies non-embedded `depends_on` after reset)
 - `docker-compose.deployer.portreset.yml` / `docker-compose.deployer.portmap.yml` (primary port remap)
 - `.deployer.env`
 
-Teach users: commit **only** the base compose + app source; ignore generated files in git if they appear in a local clone.
+**Never commit these files.** They are generated at deploy time and will churn or leak secrets.
+
+**Action:** Ensure the repo **`.gitignore`** includes at least:
+
+```gitignore
+# Deployer-generated merge files and platform env (never commit)
+docker-compose.deployer*.yml
+.deployer.env
+```
+
+Commit **only** your authored compose (`docker-compose.prod.yml`, optional `docker-compose.yml`), **`.env.example`**, app source, and docs — not the files above if they appear in a local clone after a deploy.
 
 ### Optional `backends.envServiceNames` (Deployer app settings)
 
