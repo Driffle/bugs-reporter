@@ -1,75 +1,280 @@
 ---
-description: Deployer-compliant Docker Compose (team guide) — prod canonical, thin local include, discovery-first
-globs: docker-compose*.yml
-alwaysApply: false
+description: Full Deployer compose playbook when user applies @deployer-docker-compose.mdc — pipeline reference, git/GitHub/Driffle push guidance, and a mandatory closing “steps to deploy” block with exact Deployer field values.
+globs: docker-compose*.yml,compose.y*ml,compose.yaml,**/Dockerfile*,**/apps/api/src/**/*.ts,packages/shared/src/**/*.ts
+alwaysApply: true
 ---
 
-# Deployer Docker Compose (team guide)
+# Deployer-compliant Docker Compose
 
-Use after feature work is stable: know entrypoints, ports, and data dependencies. **Discover from the repo first; do not guess YAML.**
+Use this rule when the user asks for **`docker-compose.prod.yml`**, **`docker-compose.yml`**, Deployer-ready Compose, **or operational questions** such as:
 
-## File roles
+- “What env vars should I put in Deployer?”
+- “Which services / backends should I turn on in Deployer?”
+- “Why isn’t my app getting `DATABASE_URL`?” / “Why is my bundled Postgres not starting?”
 
-| File | Role |
-|------|------|
-| **`docker-compose.prod.yml`** | **Primary Deployer artifact** (default `composeFile`). Source of truth for deploy-like runs. |
-| **`docker-compose.yml`** | **Optional local wrapper**: `include: [docker-compose.prod.yml]` + thin overrides only (bind mounts, extra `ports`, profiles). |
-| **`.env.example`** | Every variable Compose + app expect. Copy to **`.env`** locally. |
-| **`.env`** / **`.deployer.env`** | Secrets; **never commit**. Platform may generate `.deployer.env`. |
+**For those questions: read the user’s repository first** (`docker-compose*.yml`, `.env.example`, app entrypoints, and how they read env). **Do not answer from generic templates alone** — tie recommendations to **their** service names, images, and env variable names.
 
-## Do not commit (gitignore)
+This rule is **portable**: copy this file into any project’s `.cursor/rules/` (set `alwaysApply` as you prefer).
 
-- `.env`, `.deployer.env`
-- Generated merge files: `docker-compose.deployer.yml`, `docker-compose.deployer.*.yml`
+## When this rule is applied (including `apply @deployer-docker-compose.mdc`)
 
-## Do not define in repo
+If the user says **apply `@deployer-docker-compose.mdc`**, **use `@deployer-docker-compose.mdc`**, or similar, treat it as a **full engagement**, not a hint:
 
-- **`deployer_platform`** network — Deployer injects it as **external**. No fake internal `deployer_platform`.
+1. **Do the work** — discover the app repo, read compose / Docker / env usage, create or fix files to be Deployer-compliant, and validate with `docker compose -f <their compose file> config` from the repo root (fix until it passes).
+2. **Do not stop at generic advice** — every recommendation must reference **this repo’s** service names, images, ports, and env vars.
+3. **Always end the response** with the section **“Deployer — steps to deploy (in order)”** below (filled in with **exact values** for *their* app). No separate “summary only” reply without that block.
 
-## Primary publish (HTTP service first)
+### Git remote discovery (required before the closing steps)
 
-Deployer picks the **first service (in injection order) that declares `ports:`**, then the **first container port** in that mapping.
+Before writing the closing steps, establish **source control facts** (use terminal/`git` when available):
 
-- Put the **HTTP/API service first** in `docker-compose.prod.yml` and give **only that app** host `ports:` for the public listener.
-- **Postgres / Redis**: use **`expose:`** only in prod so DBs are not mistaken for the primary published service. Add **`ports:`** in `docker-compose.yml` overrides for local host access (psql, redis-cli).
+| Situation | What to tell the user |
+|-----------|------------------------|
+| **Not a Git repository** | Deployer clones a URL; they must **create** a remote repo, **`git init`**, commit, add `origin`, and **push** so Deployer has something to pull. |
+| **Git repo, no `origin`** | They must **add a remote** and **push**; give them the exact `git remote add` / `git push -u` commands once you know their host. |
+| **`origin` is GitHub** (`github.com`, including **ghe** / Enterprise hostnames if shown) | They must **push** all compose changes to the branch Deployer will track. For **private** repos, remind them Deployer needs access (e.g. GitHub PAT in Deployer settings). Give the **exact** HTTPS and SSH clone URLs if useful. |
+| **`origin` path is org `Driffle/*` (case-insensitive)** | **Highlight:** many **Driffle** GitHub repos **block direct pushes to `main`** (rulesets / branch protection). In the steps, say explicitly: push to a **feature branch**, open a **PR**, merge to `main` (or set Deployer’s **branch** to the feature branch if they deploy from there). Do **not** assume `git push origin main` works until they confirm rules. |
+| **`origin` is not GitHub** (GitLab, Bitbucket, Codeberg, Gitea, Forgejo, self-hosted, etc.) | **Highlight:** Deployer still needs a **clone URL** the **Deployer server** can reach; pushing is to **that** remote, not “GitHub”. Mention **SSH deploy keys** or **tokens** if the remote is private. |
+| **Clean tree, already pushed** | Say “no push needed” only if their **intended branch** on the remote already contains the changes; otherwise they must push. |
 
-## Managed backend hostnames (typical)
+Always mention **uncommitted** or **unpushed** work: Deployer deploys what’s on the **remote** at **fetch time**, not local-only edits.
 
-| Backend | Hostname |
-|---------|----------|
-| Postgres | `postgres` |
-| MySQL | `mysql` |
-| Redis | `redis` |
-| MongoDB | `mongo` |
-| MinIO | `minio` |
+### Required closing block: `Deployer — steps to deploy (in order)`
 
-Align **`DATABASE_URL`**, **`REDIS_*`**, **`REDIS_URL`** with Deployer injected keys when backends are provisioned there.
+End every **apply-rule** response with this heading and **numbered steps**. Replace *italics* with **concrete values** from the user’s repo (no placeholders left vague like “your URL” without filling it).
 
-## Embedded infra suppression
+1. **Push your code (read carefully — depends on host / org)**  
+   - State **whether push is required** (uncommitted / unpushed / wrong branch).  
+   - **GitHub + `Driffle/` org:** spell out that **`main` may be protected** → push branch *`…`*, open PR, merge (or configure Deployer **branch** to *`…`*).  
+   - **GitHub, not Driffle:** normal `git push origin *branch*` unless their repo has its own rules (mention if unknown).  
+   - **Not GitHub:** push to *their* remote; Deployer **Git URL** must match what the server can clone (HTTPS/SSH + auth).  
+   - **No git / no remote:** steps to create repo + first push.
 
-Official **`postgres`**, **`redis`**, etc. images may be **suppressed** on Deployer when the platform already provisions those backends. Your app service must still be a **non-embedded** `build:`/`image:` service.
+2. **Platform (on the Deployer host)**  
+   - Start / ensure the **platform stack** is up if they use **any** backend (Postgres, MySQL, Redis, Mongo, MinIO) or follow their Deployer docs.
 
-## Logging (optional)
+3. **In Deployer UI — register app (exact fields)**  
+   - **Name:** *`…`* (slug will derive from name).  
+   - **Git URL:** *`https://…git` or `git@…`* (same repo you pushed).  
+   - **Branch:** *`main`* or *`…`* (must contain the commit with this compose).  
+   - **Compose file:** *`docker-compose.prod.yml`* or *`…`* (path relative to repo root).
 
-Use **`x-logging`** anchor with `json-file`, `max-size: 50m`, `max-file: 3` on services; aligns with platform style.
+4. **In Deployer UI — backends / services (checkboxes)**  
+   For each toggle, **on or off** with one-line **why** for *this* repo (embedded `db` image vs platform Postgres, etc.).  
+   If using **`envServiceNames`**, list **exact** compose service names.
 
-## Validation (required before PR)
+5. **In Deployer UI — app environment / secrets**  
+   Paste **exact** `KEY=value` lines **only** for non-managed vars (or write **“none”**). List managed keys **not** to set.
 
-From repo root:
+6. **Deploy**  
+   Run deploy from Deployer; note **registered host port** behavior (container port from primary published service) and where to open the app.
+
+Keep steps **short, ordered, and copy-paste friendly**; put edge cases in one line under step 1 if needed.
+
+**Casual Q&A** (user did **not** ask to apply this rule): you may answer without the full closing block if a short explanation is enough.
+
+## Goal
+
+- **`docker-compose.prod.yml`**: primary artifact Deployer uses by default (`composeFile` default is `docker-compose.prod.yml`).
+- **`docker-compose.yml`**: optional local dev entrypoint; prefer thin `include` of prod unless the project needs real divergence.
+
+## How Deployer builds the final `docker compose` run (read this for precise Q&A)
+
+End state: Deployer runs **`docker compose`** from the **cloned repo root** with project name derived from the app **slug** (`composeProjectNameForSlug`). The **base** file is whatever the app record stores as `compose_file` (default **`docker-compose.prod.yml`**).
+
+### Step-by-step (deploy)
+
+1. **Clone / update** the Git repo (depth-limited fetch, checkout branch).
+2. **Resolve** `composePath` = `{repoRoot}/{compose_file}`. Missing file → deploy error.
+3. **List services** from the base compose: every key under `services:` becomes a candidate.
+4. **Placeholder env files**: for any `env_file` path under the repo that is missing, Deployer writes a tiny placeholder so Compose does not fail on “file not found.”
+5. **Embedded infra detection** (`embeddedPlatformDuplicateServices`): services whose **`image:`** matches Postgres, MySQL/MariaDB, Redis, Mongo, or MinIO patterns are **never started** by Deployer (see table below). `appServicesToStart` = all services minus these.
+6. **Sanity check**: if nothing remains after stripping embedded images → error (“only database/cache/object-store images”).
+7. **Whether to generate merge files + `.deployer.env`** (`needsDeployerCompose`): **true** if **any** of:
+   - **MySQL, Postgres, Redis, or Mongo** backend is enabled for the app (`needsProvision` / `needsDb`), **or**
+   - **MinIO** backend is enabled (`needsMinio`), **or**
+   - the app has **user-supplied env text** (`userEnv` / `user_env_text`) in Deployer, **or**
+   - the Deployer server has **platform OTEL injection** enabled (`injectPlatformOtel`).
+   If **false**, Deployer **deletes** `docker-compose.deployer.yml`, dependency merge fragments, and `.deployer.env` if present — deploy is **base compose only** (no platform network injection).
+8. **Which services get platform env + network** (`injectForServices`):
+   - If **`backends.envServiceNames`** is a non-empty array → **only** those service names (must exist in the base compose); otherwise → **all** `appServicesToStart` (every non-embedded app service). Embedded-dup services are always excluded.
+9. **Provisioning** (only if a backend is enabled): `provisionAppDatabases` creates DB users/ACLs/buckets on the **platform** containers; result drives env lines (see **Managed keys**).
+10. **Write `.deployer.env`**: merge **user env** (from Deployer app settings) **minus** managed keys for enabled backends, then append **platform-provisioned** lines (`buildMergedDeployerEnvContent` in `apps/api/src/deploy/dotenv-merge.ts`).
+11. **Write `docker-compose.deployer.yml`**: for each name in `injectForServices`, add `env_file: [.deployer.env]`, `networks: [deployer_platform]`, optional **`environment:`** map = **entire parsed `.deployer.env`** plus OTEL overrides — so injected values **override** the base file’s `environment` for those keys.
+12. **Dependency merge files** (if any injected service had `depends_on` embedded infra): `docker-compose.deployer.depreset.yml` (`depends_on: !reset []`) and possibly `docker-compose.deployer.depspatch.yml` to restore non-embedded deps.
+13. **Port remap files** (if applicable): `docker-compose.deployer.portreset.yml` / `portmap.yml` for the **registered host port** on the **primary** published service.
+14. **`docker compose up` arguments**:
+    - **Files** (in order): `-f {compose_file}`; if deployer compose exists → `-f docker-compose.deployer.yml`; then optional `-f docker-compose.deployer.depreset.yml`, `depspatch`, `portreset`, `portmap`.
+    - If **embedded duplicates** exist: adds **`--no-deps`** and explicit **service names** to start (`appServicesToStart` only) so suppressed infra containers are not pulled up.
+    - Otherwise: `up -d --build` for the whole project (default service set).
+    - After **credential rotation** reprovision: may add `--force-recreate`.
+
+### FAQ: “What env should I put in Deployer?”
+
+- **Source of truth in UI**: app **environment / secrets** field stored as `user_env_text` (dotenv-style `KEY=value` lines).
+- **Put there**: anything **app-specific** that is **not** provisioned by Deployer — e.g. `JWT_SECRET`, `SESSION_SECRET`, third-party API keys, feature flags, **non-managed** `OTEL_*` overrides.
+- **Do not put there** (they are **stripped** and replaced if the matching backend is enabled): all **Managed keys** listed below; if **MinIO** is enabled, **all** `MINIO_*` and `S3_*` keys are stripped from user env too.
+- **If no backends are enabled** and no user env: `needsDeployerCompose` is false unless OTEL injection is on — then **no** `.deployer.env` merge; the app only sees what is in the **base compose** `environment` / `env_file`.
+- **Repo-aware answer**: open the user’s **compose** and **application code** — list which `process.env.*` / config names they use. Map each to either “set in Deployer user env” or “provided automatically when you enable Postgres/MySQL/…” or “must stay in compose / image.” **Call out conflicts**: e.g. base compose `environment.DATABASE_URL` pointing at a **bundled** `db` service vs enabling **Postgres** in Deployer (merged `environment` + `env_file` **override** base for injected services — prefer **one** strategy).
+
+### FAQ: “What services / backends should I choose on Deployer?”
+
+Deployer **app backends** (`backends` on create/update app) are **checkboxes**, not Docker Compose service names.
+
+| Toggle | Effect | Provisioning | Env keys added to `.deployer.env` (and injected services) |
+|--------|--------|--------------|------------------------------------------------------------|
+| **Postgres** | App DB on platform | DB + role on platform Postgres | `POSTGRES_*`, `DATABASE_URL` (`postgresql://…`) |
+| **MySQL** | App DB on platform | DB + user on platform MySQL | `MYSQL_*`, `DATABASE_URL` (`mysql://…`) |
+| **Redis** | App cache on platform | Redis ACL user | `REDIS_*`, `REDIS_URL`, `REDIS_KEY_PREFIX` |
+| **Mongo** | App DB on platform | User in DB | `MONGO_*`, `MONGO_URL`, `MONGODB_URI`, `MONGODB_DB_NAME` |
+| **MinIO** | Object storage | Bucket + S3-compat vars | `MINIO_*`, `S3_*` |
+
+- **MinIO** alone can trigger `needsDeployerCompose` / `.deployer.env` even when no SQL DB is selected.
+- **Embedded compose DB**: if the repo’s compose already runs **`postgres`/`mysql`/… image services**, those containers **do not run** under Deployer; enabling the **same** platform backend supplies **platform** hostnames (`postgres`, `mysql`, …). Either rely on **platform** + toggles **on**, or **remove embedded DB images** and use toggles — avoid duplicating intent.
+- **`envServiceNames`**: optional list of **compose service names** that should receive `.deployer.env` + `deployer_platform`. **Default empty** = **all** non-embedded services (recommended for web + workers sharing one credential set).
+
+**Repo-aware answer**: list **their** compose **service names** and **images**; say exactly which containers **will** and **will not** start; say which backend toggles match **their** stack (e.g. “only `web` runs; your `db` image is suppressed — enable Postgres or drop `DATABASE_URL` to the bundled hostname for local-only compose”).
+
+## Mandatory discovery (before writing YAML)
+
+1. **Entrypoints**: `package.json` scripts, `Dockerfile*` / `docker/*`, `Procfile`, `railway.toml`, `fly.toml`, etc.
+2. **Processes**: distinguish **web** vs **workers** / **sidecars**; one Compose service per distinct long-running command unless they truly share the same lifecycle.
+3. **Listen port**: container port must match `ports` mapping and app config; Deployer remaps the **primary** published service’s **host** port (see **Primary publish** below).
+4. **Data dependencies**: infer Postgres, MySQL, Redis, Mongo, S3/MinIO from code and env (`DATABASE_URL`, `REDIS_URL`, `MONGODB_URI`, `S3_*`, etc.). On the platform network, standard hostnames are **`postgres`**, **`mysql`**, **`redis`**, **`mongo`**, **`minio`** (Deployer platform stack service names).
+5. **Env contract**: align variable **names** with **Managed keys** below when app backends are provisioned in Deployer; do not document conflicting names for the same secret.
+
+## Reference pattern (multi-service app + optional embedded infra)
+
+A solid template is: one **`web`** (or main API) service with `build` or `image`, `ports` for the HTTP port, `env_file: [.env]` if the app expects it, and optional **embedded** DB/cache/object-store services using official images for **local-only** parity. Example shape (adjust names/ports to the repo):
+
+- App service(s): `build: .` or explicit `image`, explicit `command` if not Dockerfile `CMD`.
+- Embedded infra: `postgres:*`, `mysql:*`, `redis:*`, `mongo:*`, `minio/*` images with volumes and `healthcheck` where useful.
+- **`depends_on`** with `condition: service_healthy` / `service_started` is fine; Deployer may strip dependencies on embedded services at deploy time (see **Generated merge files**).
+
+For a **minimal** local wrapper, use Compose **`include`** so prod stays canonical:
+
+```yaml
+# docker-compose.yml — local dev reuses prod definitions
+include:
+  - docker-compose.prod.yml
+```
+
+Add sibling keys only when you need overrides (extra `services` patches, profiles, etc.). Avoid duplicating the full prod stack unless necessary.
+
+## Deployer runtime contract (self-contained)
+
+See **How Deployer builds the final `docker compose` run** above for the numbered pipeline, FAQ env/backends, and `compose` CLI file order.
+
+### External network and injection
+
+- **Network name**: `deployer_platform` (external bridge to the platform stack).
+- When Deployer provisions backends, pastes user env, or injects platform OTEL, it generates **`docker-compose.deployer.yml`** that, for selected services, adds:
+  - `networks: [deployer_platform]`
+  - `env_file: [.deployer.env]`
+  - `logging`: json-file, `max-size: 50m`, `max-file: 3`
+  - **`environment`**: every key from merged **`.deployer.env`** (plus platform OTEL when enabled), so values **override** the base compose file's `environment` block (Compose gives `environment` precedence over `env_file`)
+
+**Do not** declare `deployer_platform` in the repo as a non-external network. Deployer injects `external: true`. Project-defined **internal** networks for local-only links are OK.
+
+### Embedded infra suppression (image-based)
+
+Any service whose `image:` string matches (case-insensitive) is treated as **embedded platform duplicate** — Deployer **does not start** that container when deploying; only **non-matching** services are passed to `docker compose up`:
+
+| Backend kind | Image pattern (substring on `image:`) |
+|--------------|--------------------------------------|
+| Postgres     | `postgres` or `postgresql` (image name segment) |
+| MySQL        | `mysql` or `mariadb` |
+| Redis        | `redis` |
+| MongoDB      | `mongo` |
+| MinIO        | `minio` |
+
+**Requirement**: After removing those services, at least **one** service must remain (e.g. `web`, workers). If the file is **only** embedded infra, deploy fails.
+
+**Build-only services** (no `image:`) are never classified as embedded duplicates.
+
+### `env_file` and missing files
+
+If `env_file` points to a path under the repo that **does not exist**, Deployer creates a **placeholder** so `docker compose` does not exit with “file not found.” Prefer committing **`.env.example`** and documenting copy-to-`.env`; ensure **`.gitignore`** includes `.env` and `.deployer.env` (secrets).
+
+### Managed environment keys (provisioned / overridden by Deployer)
+
+Keys below are written to **`.deployer.env`** and mirrored into compose **`environment`** for services that receive the merge (so they beat base-compose defaults). User env pasted in Deployer UI is **stripped** of these (and when MinIO is enabled, of **all** `MINIO_*` and `S3_*` keys) so they do not override provisioned values.
+
+**MySQL** (`backends.mysql`): `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, plus `DATABASE_URL`.
+
+**Postgres** (`backends.postgres`): `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, plus `DATABASE_URL`.
+
+**Either DB**: `DATABASE_URL` is managed.
+
+**Redis** (`backends.redis`): `REDIS_HOST`, `REDIS_PORT`, `REDIS_USER`, `REDIS_PASSWORD`, `REDIS_URL`, `REDIS_KEY_PREFIX`.
+
+**Mongo** (`backends.mongo`): `MONGO_HOST`, `MONGO_PORT`, `MONGO_DATABASE`, `MONGO_USER`, `MONGO_PASSWORD`, `MONGO_URL`, `MONGODB_URI`, `MONGODB_DB_NAME`.
+
+**MinIO** (`backends.minio`): `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`.
+
+### Platform OTEL (when Deployer server enables injection)
+
+Defaults merged into injected `environment` include: `OTEL_SERVICE_NAME` (from app slug), `OTEL_METRICS_EXPORTER=otlp`, `OTEL_TRACES_EXPORTER=none`, `OTEL_LOGS_EXPORTER=none`, `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`, **`OTEL_EXPORTER_OTLP_ENDPOINT=http://vector:4318`**. Any user `OTEL_*` in app env overrides per key.
+
+### Primary publish / registered host port
+
+- Deployer allocates a **registered host port** in **`1001`–`2999`** per app.
+- It picks the **first service** in **injection order** that declares `ports`, takes the **first container port** from that mapping, and writes merge files to set **`registered:containerPort`** on the host.
+- **Injection order**: explicit `envServiceNames` (if set in Deployer) first, then remaining app services. Put the **intended public HTTP** service first in that effective order if using `envServiceNames`.
+
+### Generated files — never hand-edit
+
+Deployer may create or overwrite:
+
+- `docker-compose.deployer.yml`
+- `docker-compose.deployer.depreset.yml` (`depends_on: !reset []` for services that depended on embedded infra — **Deployer-specific YAML extension**, not standard Docker Compose)
+- `docker-compose.deployer.depspatch.yml` (reapplies non-embedded `depends_on` after reset)
+- `docker-compose.deployer.portreset.yml` / `docker-compose.deployer.portmap.yml` (primary port remap)
+- `.deployer.env`
+
+**Never commit these files.** They are generated at deploy time and will churn or leak secrets.
+
+**Action:** Ensure the repo **`.gitignore`** includes at least:
+
+```gitignore
+# Deployer-generated merge files and platform env (never commit)
+docker-compose.deployer*.yml
+.deployer.env
+```
+
+Commit **only** your authored compose (`docker-compose.prod.yml`, optional `docker-compose.yml`), **`.env.example`**, app source, and docs — not the files above if they appear in a local clone after a deploy.
+
+### Optional `backends.envServiceNames` (Deployer app settings)
+
+If set, **only** those compose service names receive `.deployer.env`, `deployer_platform`, and managed overrides. Others start without that injection. **Default (empty)** applies injection to **all non-embedded** app services — one shared credential set (recommended for web + workers).
+
+## Authoring checklist
+
+- [ ] If the user **applied `@deployer-docker-compose.mdc`**: git/remote discovery done, compose validated, response ends with **`Deployer — steps to deploy (in order)`** (see above).
+- [ ] **`docker-compose.prod.yml` exists** (or user-chosen compose path matches Deployer app settings).
+- [ ] **≥1 non-embedded service** (not only postgres/mysql/redis/mongo/minio images).
+- [ ] **Primary web/API** exposes `ports`; container port matches the app listener.
+- [ ] **`env_file` paths** exist locally or are documented (`.env.example`).
+- [ ] **No fake `deployer_platform`** network definition as internal.
+- [ ] **Restart / healthchecks** on infra images where it improves `depends_on` reliability locally.
+- [ ] Optional: **`x-logging`** anchor (json-file, 50m / 3 files) aligned with platform style.
+
+## When `docker-compose.yml` is missing
+
+- If the user wants **local Docker dev** and only prod exists: add **`docker-compose.yml`** with `include: [docker-compose.prod.yml]` and a one-line comment pointing to prod.
+- If **prod is missing** but local exists: **promote or split** — Deployer expects a dedicated prod file by default; either rename/split so `docker-compose.prod.yml` is the deploy artifact or document a non-default `composeFile` in Deployer.
+- **Do not** blindly duplicate services across two files unless local and prod genuinely differ (e.g. profiles, bind mounts, debug tools).
+
+## Validation
+
+After edits, from the **repository root**:
 
 ```bash
 docker compose -f docker-compose.prod.yml config
 ```
 
-Fix errors until this succeeds.
+Fix YAML/Compose errors until this succeeds. A full `up` may still require the `deployer_platform` network and images locally; `config` validates structure.
 
-## This repo (bugs-reporter)
+## If the user does not use Deployer
 
-- **Web**: `bugs-reporter` — root **`Dockerfile`**, NestJS, **`PORT=3000`**, health **`GET /health`**, Slack **`POST /slack/events`**.
-- **Workers**: BullMQ runs **in-process** with the API (same container); not a separate Compose service.
-- **Embedded (prod file)**: `postgres:16-alpine`, `redis:7-alpine` for local/standalone parity; **`expose` only** on prod file.
-- **Canonical env**: repo root **`.env.example`**.
-
-## Cursor one-shot prompt
-
-Attach this rule (`@.cursor/rules/deployer-docker-compose.mdc`), then ask the agent to re-run discovery and deliverables from the team PDF checklist, and to run **`docker compose -f docker-compose.prod.yml config`**.
+The same files are valid **standalone** Compose; ignore sections about generated files and managed keys when not deploying via Deployer.
