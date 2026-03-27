@@ -22,4 +22,6 @@ RUN npm prune --omit=dev
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+# Migrations should run in Railway "Release" / pre-deploy, not here — otherwise nothing listens on PORT
+# until migrate finishes and Slack/Railway probes can time out.
+CMD ["node", "dist/main.js"]
