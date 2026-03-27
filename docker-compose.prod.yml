@@ -4,7 +4,8 @@
 # Primary publish: first service with `ports` must be the HTTP API (bugs-reporter). Postgres/Redis use `expose` only
 # so Deployer does not treat DB port as the public app port. For host access to DBs locally, use docker-compose.yml overrides.
 #
-# Managed backend hostnames (Deployer / embedded): postgres, redis
+# Env: do NOT bake DATABASE_URL / secrets here — they come from repo .env (local) or Deployer merge (.deployer.env / managed
+# backends). A default like bugs:bugs breaks auth (P1000) when the platform provisions driffle_* DB users.
 
 x-logging: &default-logging
   driver: json-file
@@ -27,23 +28,6 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
-      DATABASE_URL: ${DATABASE_URL:-postgresql://bugs:bugs@postgres:5432/bugs_reporter}
-      REDIS_URL: ${REDIS_URL:-}
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
-      SLACK_SIGNING_SECRET: ${SLACK_SIGNING_SECRET:-}
-      CHANNEL_ID: ${CHANNEL_ID:-}
-      PROCESS_THREADS: ${PROCESS_THREADS:-false}
-      PLANE_BASE_URL: ${PLANE_BASE_URL:-https://plan.driffle.org}
-      PLANE_API_KEY: ${PLANE_API_KEY:-}
-      PLANE_WORKSPACE_SLUG: ${PLANE_WORKSPACE_SLUG:-driffle}
-      PLANE_PROJECT_ID: ${PLANE_PROJECT_ID:-}
-      PLANE_STATE_ID: ${PLANE_STATE_ID:-}
-      PLANE_LABEL_IDS: ${PLANE_LABEL_IDS:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
     command: ["sh", "-c", "npx prisma migrate deploy && exec node dist/main.js"]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
