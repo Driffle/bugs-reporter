@@ -1,0 +1,75 @@
+---
+description: Deployer-compliant Docker Compose (team guide) — prod canonical, thin local include, discovery-first
+globs: docker-compose*.yml
+alwaysApply: false
+---
+
+# Deployer Docker Compose (team guide)
+
+Use after feature work is stable: know entrypoints, ports, and data dependencies. **Discover from the repo first; do not guess YAML.**
+
+## File roles
+
+| File | Role |
+|------|------|
+| **`docker-compose.prod.yml`** | **Primary Deployer artifact** (default `composeFile`). Source of truth for deploy-like runs. |
+| **`docker-compose.yml`** | **Optional local wrapper**: `include: [docker-compose.prod.yml]` + thin overrides only (bind mounts, extra `ports`, profiles). |
+| **`.env.example`** | Every variable Compose + app expect. Copy to **`.env`** locally. |
+| **`.env`** / **`.deployer.env`** | Secrets; **never commit**. Platform may generate `.deployer.env`. |
+
+## Do not commit (gitignore)
+
+- `.env`, `.deployer.env`
+- Generated merge files: `docker-compose.deployer.yml`, `docker-compose.deployer.*.yml`
+
+## Do not define in repo
+
+- **`deployer_platform`** network — Deployer injects it as **external**. No fake internal `deployer_platform`.
+
+## Primary publish (HTTP service first)
+
+Deployer picks the **first service (in injection order) that declares `ports:`**, then the **first container port** in that mapping.
+
+- Put the **HTTP/API service first** in `docker-compose.prod.yml` and give **only that app** host `ports:` for the public listener.
+- **Postgres / Redis**: use **`expose:`** only in prod so DBs are not mistaken for the primary published service. Add **`ports:`** in `docker-compose.yml` overrides for local host access (psql, redis-cli).
+
+## Managed backend hostnames (typical)
+
+| Backend | Hostname |
+|---------|----------|
+| Postgres | `postgres` |
+| MySQL | `mysql` |
+| Redis | `redis` |
+| MongoDB | `mongo` |
+| MinIO | `minio` |
+
+Align **`DATABASE_URL`**, **`REDIS_*`**, **`REDIS_URL`** with Deployer injected keys when backends are provisioned there.
+
+## Embedded infra suppression
+
+Official **`postgres`**, **`redis`**, etc. images may be **suppressed** on Deployer when the platform already provisions those backends. Your app service must still be a **non-embedded** `build:`/`image:` service.
+
+## Logging (optional)
+
+Use **`x-logging`** anchor with `json-file`, `max-size: 50m`, `max-file: 3` on services; aligns with platform style.
+
+## Validation (required before PR)
+
+From repo root:
+
+```bash
+docker compose -f docker-compose.prod.yml config
+```
+
+Fix errors until this succeeds.
+
+## This repo (bugs-reporter)
+
+- **Web**: `bugs-reporter` — root **`Dockerfile`**, NestJS, **`PORT=3000`**, health **`GET /health`**, Slack **`POST /slack/events`**.
+- **Workers**: BullMQ runs **in-process** with the API (same container); not a separate Compose service.
+- **Embedded (prod file)**: `postgres:16-alpine`, `redis:7-alpine` for local/standalone parity; **`expose` only** on prod file.
+- **Canonical env**: repo root **`.env.example`**.
+
+## Cursor one-shot prompt
+
+Attach this rule (`@.cursor/rules/deployer-docker-compose.mdc`), then ask the agent to re-run discovery and deliverables from the team PDF checklist, and to run **`docker compose -f docker-compose.prod.yml config`**.

@@ -5,6 +5,11 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.deployer.env
+
+# Deployer-generated merge files (never hand-edit; do not commit if generated locally)
+docker-compose.deployer.yml
+docker-compose.deployer.*.yml
 
 # Build
 dist/

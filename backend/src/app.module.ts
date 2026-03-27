@@ -8,6 +8,7 @@ import { PlaneModule } from './plane/plane.module';
 import { DeduplicationModule } from './deduplication/deduplication.module';
 import { AiModule } from './ai/ai.module';
 import { TicketProcessor } from './jobs/ticket.processor';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -16,13 +17,26 @@ import { TicketProcessor } from './jobs/ticket.processor';
       envFilePath: ['.env.local', '.env'],
     }),
     BullModule.forRootAsync({
-      useFactory: () => ({
-        connection: {
-          host: process.env.REDIS_HOST ?? 'localhost',
-          port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
-          password: process.env.REDIS_PASSWORD ?? undefined,
-        },
-      }),
+      useFactory: () => {
+        const redisOpts = {
+          maxRetriesPerRequest: null,
+          lazyConnect: true,
+          connectTimeout: 10000,
+          retryStrategy: (times: number) => Math.min(times * 300, 3000),
+        } as const;
+        const redisUrl = process.env.REDIS_URL;
+        if (redisUrl) {
+          return { connection: { url: redisUrl, ...redisOpts } };
+        }
+        return {
+          connection: {
+            host: process.env.REDIS_HOST ?? 'localhost',
+            port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
+            password: process.env.REDIS_PASSWORD ?? undefined,
+            ...redisOpts,
+          },
+        };
+      },
     }),
     BullModule.registerQueue({
       name: 'ticket',
@@ -38,6 +52,7 @@ import { TicketProcessor } from './jobs/ticket.processor';
     PlaneModule,
     DeduplicationModule,
     AiModule,
+    HealthModule,
   ],
   providers: [TicketProcessor],
 })

@@ -1,0 +1,11 @@
+# Railway: do NOT use `npm run build` as the Start Command — that exits after compiling.
+# Migrations run in preDeployCommand so the web process binds PORT immediately (avoids dial timeout).
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+preDeployCommand = ["npx prisma migrate deploy"]
+startCommand = "node dist/main.js"
+healthcheckPath = "/health"
+healthcheckTimeout = 120

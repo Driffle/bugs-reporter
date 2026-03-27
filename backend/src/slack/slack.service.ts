@@ -91,7 +91,20 @@ export class SlackService {
 
   getMessageText(event: SlackMessageEvent): string {
     const text = event.text ?? event.message?.text ?? '';
-    return String(text).trim();
+    return this.cleanText(String(text).trim());
+  }
+
+  cleanText(text: string): string {
+    return text
+      .replace(/<http[^|>]*\|([^>]+)>/g, '$1') // <http://url|label> -> label
+      .replace(/<http[^>]+>/g, '') // <http://url> -> remove
+      .replace(/<@[A-Z0-9]+\|([^>]+)>/g, '$1') // <@U…|display name> -> display name
+      .replace(/<@[A-Z0-9]+>/g, '') // <@U…> -> remove
+      .replace(/<#[A-Z0-9]+\|([^>]+)>/g, '#$1') // <#C…|name> -> #name
+      .replace(/<#([A-Z0-9]+)>/g, '#$1') // <#C…> (id only) -> #C…
+      .replace(/<![^>]+>/g, '') // <!here>, <!channel> -> remove
+      .replace(/\s{2,}/g, ' ')
+      .trim();
   }
 
   hasTrigger(text: string, hasBugEmoji?: boolean): boolean {

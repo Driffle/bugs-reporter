@@ -1,0 +1,10 @@
+# Use when the Railway service root is the repo root (root Dockerfile builds ./backend).
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+preDeployCommand = ["npx prisma migrate deploy"]
+startCommand = "node dist/main.js"
+healthcheckPath = "/health"
+healthcheckTimeout = 120
