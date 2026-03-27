@@ -96,12 +96,14 @@ export class SlackService {
 
   cleanText(text: string): string {
     return text
-      .replace(/<http[^|>]*\|([^>]+)>/g, '$1')  // <http://url|label> -> label
-      .replace(/<http[^>]+>/g, '')               // <http://url> -> remove
-      .replace(/<@[A-Z0-9]+>/g, '')              // <@USER> -> remove
-      .replace(/<#[A-Z0-9]+\|([^>]+)>/g, '#$1') // <#CHAN|name> -> #name
-      .replace(/<![^>]+>/g, '')                  // <!here>, <!channel> -> remove
-      .replace(/\s{2,}/g, ' ')                   // collapse extra spaces
+      .replace(/<http[^|>]*\|([^>]+)>/g, '$1') // <http://url|label> -> label
+      .replace(/<http[^>]+>/g, '') // <http://url> -> remove
+      .replace(/<@[A-Z0-9]+\|([^>]+)>/g, '$1') // <@U…|display name> -> display name
+      .replace(/<@[A-Z0-9]+>/g, '') // <@U…> -> remove
+      .replace(/<#[A-Z0-9]+\|([^>]+)>/g, '#$1') // <#C…|name> -> #name
+      .replace(/<#([A-Z0-9]+)>/g, '#$1') // <#C…> (id only) -> #C…
+      .replace(/<![^>]+>/g, '') // <!here>, <!channel> -> remove
+      .replace(/\s{2,}/g, ' ')
       .trim();
   }
 

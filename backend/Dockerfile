@@ -20,6 +20,10 @@ RUN npx prisma generate && npm run build
 # Drop dev-only tooling if any are later moved to devDependencies
 RUN npm prune --omit=dev
 
+RUN chown -R node:node /app
+
+USER node
+
 EXPOSE 3000
 
 # Migrations should run in Railway "Release" / pre-deploy, not here — otherwise nothing listens on PORT

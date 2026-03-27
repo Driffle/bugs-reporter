@@ -18,6 +18,10 @@ RUN npx prisma generate && npm run build
 
 RUN npm prune --omit=dev
 
+RUN chown -R node:node /app
+
+USER node
+
 EXPOSE 3000
 
 CMD ["node", "dist/main.js"]
